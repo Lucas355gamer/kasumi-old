@@ -19,25 +19,54 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Ferramentas
+        shell: bash
         run: |
-          apt-get update && apt-get install -y --no-install-recommends unzip zip curl ca-certificates
+          apt-get update && apt-get install -y --no-install-recommends unzip zip curl ca-certificates git g++ make file
           dkp-pacman -Sy --noconfirm --needed 3ds-libjpeg-turbo
           mkdir -p /tmp/tools && cd /tmp/tools
+
+          # devolve o primeiro binario com esse nome que realmente executa aqui
+          pick() {
+            for f in $(find "$1" -type f -name "$2" 2>/dev/null); do
+              chmod +x "$f"
+              if "$f" >/dev/null 2>&1; then rc=0; else rc=$?; fi
+              if [ $rc -ne 126 ] && [ $rc -ne 127 ]; then echo "$f"; return 0; fi
+              echo "nao executa: $f ($(file -b "$f" | cut -c1-60))" >&2
+            done
+          }
+
           curl -fsSL -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.19.0/makerom-v0.19.0-ubuntu_x86_64.zip
-          curl -fsSL -o bannertool.zip https://github.com/diasurgical/bannertool/releases/download/1.2.0/bannertool.zip
           unzip -o makerom.zip -d makerom
+          MR="$(pick makerom makerom)"
+          [ -n "$MR" ] || { echo "makerom nao executa"; exit 1; }
+          install -m 755 "$MR" /usr/local/bin/makerom
+
+          curl -fsSL -o bannertool.zip https://github.com/diasurgical/bannertool/releases/download/1.2.0/bannertool.zip
           unzip -o bannertool.zip -d bannertool
-          install -m 755 "$(find makerom -type f -name makerom | head -n1)" /usr/local/bin/makerom
-          BT="$(find bannertool -type f -name bannertool -path '*linux*' | head -n1)"
-          [ -n "$BT" ] || BT="$(find bannertool -type f -name bannertool | head -n1)"
-          install -m 755 "$BT" /usr/local/bin/bannertool
-          makerom -version || true
+          BT="$(pick bannertool bannertool)"
+          if [ -z "$BT" ]; then
+            echo "Compilando o bannertool do codigo-fonte..."
+            git clone --recursive --depth 1 https://github.com/diasurgical/bannertool bt-src
+            make -C bt-src -j"$(nproc)" || true
+            BT="$(pick bt-src bannertool)"
+          fi
+          if [ -n "$BT" ]; then
+            install -m 755 "$BT" /usr/local/bin/bannertool
+          else
+            echo "::warning::bannertool indisponivel; o .cia sai sem banner animado"
+          fi
 
       - name: Compilar .3dsx e .cia
         working-directory: 3ds
+        shell: bash
         run: |
           make -f kasumi.mk
-          make -f kasumi.mk cia
+          if command -v bannertool >/dev/null; then
+            make -f kasumi.mk cia
+          else
+            makerom -f cia -o kasumi-old.cia -elf kasumi-old.elf -rsf resources/app.rsf \
+                    -icon kasumi-old.smdh -exefslogo -target t
+          fi
           ls -la kasumi-old.3dsx kasumi-old.cia
 
       - name: Empacotar a ponte do PC
