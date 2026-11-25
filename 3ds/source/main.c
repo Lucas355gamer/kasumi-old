@@ -626,7 +626,10 @@ int main(void)
 {
     osSetSpeedupEnable(true);   /* New 3DS: 804 MHz + cache L2. No Old 3DS nao faz nada. */
     gfxInit(GSP_RGB565_OES, GSP_RGB565_OES, false);
-    gfxSetDoubleBuffering(GFX_BOTTOM, false);
+    /* buffer duplo nas duas telas: toda tela de baixo e redesenhada inteira antes
+       da troca, entao nao ha "rasgo" (tearing) enquanto o LCD le a memoria */
+    gfxSetDoubleBuffering(GFX_TOP, true);
+    gfxSetDoubleBuffering(GFX_BOTTOM, true);
     acInit();
 
     memset(&A, 0, sizeof(A));
