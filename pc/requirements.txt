@@ -1,0 +1,11 @@
+pillow>=9.1
+mss>=7.0
+numpy>=1.21
+# controle de Xbox virtual (Windows: instale tambem o driver ViGEmBus)
+vgamepad>=0.1.0; sys_platform == "win32"
+# audio do PC (loopback)
+soundcard>=0.4.2
+# teclado remoto, mouse pelo toque e modo teclado
+pynput>=1.7
+# --window (capturar uma janela especifica)
+pygetwindow>=0.0.9; sys_platform == "win32"
